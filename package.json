@@ -5,6 +5,6 @@
     "build:frontend": "cd frontend && npm install && npm run build",
     "copy:build": "rm -rf backend/build && cp -r frontend/build backend/",
     "build": "npm run build:frontend && npm run copy:build",
-    "start": "npm run build && cd backend && npm install && node server.js"
+    "start": "cd backend && npm install && node server.js"
   }
 }
