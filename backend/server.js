@@ -44,17 +44,15 @@ const authToken = Buffer.from(`${userEmail}:${apiKey}`).toString('base64');
 
 /**
  * Endpoint для получения дерева секций (папок) из TestRail.
- * Теперь URL TestRail берётся из конфигурации, а не передаётся от клиента.
  */
 app.post('/api/testrail/folders',
-    // Валидация входных данных: path опционально, если указан – строка.
     body('path').optional().isString(),
     async (req, res) => {
         const errors = validationResult(req);
         if (!errors.isEmpty()){
             return res.status(400).json({ errors: errors.array() });
         }
-        const { path: userPath } = req.body; // path может использоваться для дополнительной логики, если потребуется
+        const { path: userPath } = req.body;
         console.log(`[FOLDERS] Request received. path=${userPath}`);
         try {
             const response = await axios.get(`${testrailUrl}/index.php?/api/v2/get_sections/${projectId}&suite_id=${suiteId}`, {
@@ -65,7 +63,6 @@ app.post('/api/testrail/folders',
             if (!sections || !Array.isArray(sections)) {
                 throw new Error('Sections data is not an array');
             }
-            // Построение дерева секций по parent_id
             const buildTree = (sections, parentId) => {
                 return sections
                     .filter(section => section.parent_id == parentId)
@@ -86,12 +83,7 @@ app.post('/api/testrail/folders',
     }
 );
 
-/**
- * Endpoint для получения статистики тест-кейсов по выбранным секциям.
- * Ожидается массив folderIds в теле запроса.
- */
 app.post('/api/testrail/data',
-    // Валидация: folderIds обязателен и должен быть массивом
     body('folderIds').isArray(),
     async (req, res) => {
         const errors = validationResult(req);
@@ -101,7 +93,6 @@ app.post('/api/testrail/data',
         const { folderIds } = req.body;
         console.log(`[DATA] Request received for folderIds: ${folderIds}`);
         try {
-            // Функция для получения тест-кейсов для конкретной секции
             const fetchTestCases = async (folderId) => {
                 const url = `${testrailUrl}/index.php?/api/v2/get_cases/${projectId}&suite_id=${suiteId}&section_id=${folderId}`;
                 console.log(`[DATA] Fetching test cases for folderId: ${folderId}`);
@@ -125,7 +116,6 @@ app.post('/api/testrail/data',
             let candidateTests = [];
             let noTests = [];
 
-            // Перебираем все запрошенные folderIds
             for (let folderId of folderIds) {
                 const testCases = await fetchTestCases(folderId);
                 testCases.forEach(testCase => {
@@ -165,12 +155,10 @@ app.post('/api/testrail/data',
     }
 );
 
-// ========== Раздача статических файлов React ==========
-
-// Папка build должна находиться в корне проекта (сгенерированная командой "npm run build")
+// Раздача статических файлов React из папки build (которая находится в backend)
 app.use(express.static(path.join(__dirname, 'build')));
 
-// Все остальные GET-запросы отдаём index.html (для поддержки client-side routing)
+// Для поддержки client-side routing отдаём index.html для всех GET-запросов
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });

@@ -87,10 +87,13 @@ function App() {
         return values;
     };
 
-    // Получаем структуру секций (используем URL для folders, не меняем)
+    // Определяем базовый URL API. Если переменная окружения REACT_APP_API_URL задана, используем её, иначе – относительный URL.
+    const apiUrl = process.env.REACT_APP_API_URL || '';
+
+    // Получаем структуру секций (используем относительный URL для обращения к API)
     const fetchSections = async () => {
         try {
-            const response = await axios.post('http://localhost:5001/api/testrail/folders', {
+            const response = await axios.post(`${apiUrl}/api/testrail/folders`, {
                 testrailUrl,
                 path
             });
@@ -132,9 +135,8 @@ function App() {
         if (!checked.length) return;
         setLoadingChart(true);
         try {
-            // Используем идентификаторы разделов (folders) как есть
             const folderIds = checked.map((id) => parseInt(id, 10));
-            const response = await axios.post('http://localhost:5001/api/testrail/data', {
+            const response = await axios.post(`${apiUrl}/api/testrail/data`, {
                 testrailUrl,
                 folderIds
             });
