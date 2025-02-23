@@ -37,7 +37,6 @@ body {
     letter-spacing: 1px;
 }
 
-/* Поисковая строка убрана */
 .search-container {
     display: none;
 }
@@ -58,7 +57,6 @@ body {
     align-items: center;
     margin-bottom: 12px;
     font-weight: 500;
-    /* Остальные элементы могут наследовать цвет, переопределим для title */
 }
 
 .section-title {
@@ -83,7 +81,6 @@ body {
     cursor: pointer;
 }
 
-/* Иконки expand/collapse */
 .custom-expand-icon {
     font-size: 16px;
     color: var(--primary-color);
@@ -96,7 +93,6 @@ body {
     color: var(--primary-hover);
 }
 
-/* Иконки чекбоксов */
 .custom-check-icon,
 .custom-uncheck-icon,
 .custom-half-check-icon {
@@ -119,14 +115,12 @@ body {
     color: var(--primary-color);
 }
 
-/* Скрываем стандартные иконки react-checkbox-tree */
 div.react-checkbox-tree .rct-icon-check,
 div.react-checkbox-tree .rct-icon-uncheck,
 div.react-checkbox-tree .rct-icon-half-check {
     display: none !important;
 }
 
-/* Кнопки */
 .btn {
     padding: 10px 16px;
     font-size: 15px;
@@ -146,7 +140,6 @@ div.react-checkbox-tree .rct-icon-half-check {
     color: #fff;
 }
 
-/* Второстепенные кнопки остаются исходными */
 .btn-secondary {
     background: var(--secondary-color);
     color: #fff;
@@ -155,7 +148,6 @@ div.react-checkbox-tree .rct-icon-half-check {
     background: var(--secondary-hover);
 }
 
-/* Кнопка light: для Expand All, Collapse All, Rename Chart и Apply Title */
 .btn-light {
     padding: 8px 12px;
     font-size: 13px;
@@ -171,7 +163,6 @@ div.react-checkbox-tree .rct-icon-half-check {
     background: var(--primary-hover);
 }
 
-/* Action buttons */
 .action-buttons {
     display: flex;
     justify-content: center;
@@ -179,7 +170,6 @@ div.react-checkbox-tree .rct-icon-half-check {
     margin-bottom: 20px;
 }
 
-/* Nyan Cat loader */
 .nyan-cat-wrapper {
     display: flex;
     flex-direction: column;
@@ -193,7 +183,6 @@ div.react-checkbox-tree .rct-icon-half-check {
     border-radius: 4px;
 }
 
-/* Контейнер одного графика */
 .chart-container {
     position: relative;
     text-align: center;
@@ -226,7 +215,6 @@ div.react-checkbox-tree .rct-icon-half-check {
     gap: 8px;
 }
 
-/* Кнопка удаления (иконка) — уменьшена */
 .remove-chart-btn {
     background-color: #dc3545;
     display: flex;
@@ -242,7 +230,6 @@ div.react-checkbox-tree .rct-icon-half-check {
     height: 14px;
 }
 
-/* Форма редактирования имени */
 .edit-chart-form {
     margin-top: 10px;
     display: flex;
@@ -275,7 +262,6 @@ div.react-checkbox-tree .rct-icon-half-check {
     background: var(--primary-hover);
 }
 
-/* Подпись под диаграммой */
 .chart-info {
     margin-top: 10px;
     font-size: 16px;
@@ -283,10 +269,8 @@ div.react-checkbox-tree .rct-icon-half-check {
     color: #444;
 }
 
-/* Скрываем при экспорте */
 .no-export {}
 
-/* Списки тест-кейсов */
 .test-case-list {
     margin: 20px 0;
     background-color: var(--container-bg);
@@ -314,7 +298,6 @@ div.react-checkbox-tree .rct-icon-half-check {
     color: #333;
 }
 
-/* Footer с указанием авторства */
 .footer {
     text-align: center;
     margin-top: 20px;

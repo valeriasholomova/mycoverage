@@ -7,15 +7,15 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import './App.css';
 
-// Задаём цвета для сегментов графика (без изменений)
+// Set colors for chart segments (unchanged)
 const fixedColors = {
-    Yes: '#008000', // зелёный
-    'Automation Candidate': '#FFD700', // жёлтый
-    No: '#FF0000'   // красный
+    Yes: '#008000', // green
+    'Automation Candidate': '#FFD700', // yellow
+    No: '#FF0000'   // red
 };
 
 /**
- * Кастомная надпись на сегменте: добавляем знак "%"
+ * Custom label on segment: adds "%" sign
  */
 const renderCustomizedLabel = (props) => {
     const { x, y, value } = props;
@@ -34,7 +34,7 @@ const renderCustomizedLabel = (props) => {
 };
 
 /**
- * Кастомный tooltip: показывает только "%" без количества тест-кейсов
+ * Custom tooltip: displays only "%" without the number of test cases
  */
 const CustomTooltip = ({ active, payload }) => {
     if (!active || !payload || !payload.length) return null;
@@ -60,14 +60,13 @@ function App() {
     const [treeData, setTreeData] = useState([]);
     const [checked, setChecked] = useState([]);
     const [expanded, setExpanded] = useState([]);
-
     const [chartsData, setChartsData] = useState([]);
     const [loadingChart, setLoadingChart] = useState(false);
-
     const [editingIndex, setEditingIndex] = useState(null);
     const [draftName, setDraftName] = useState('');
+    const [showInfo, setShowInfo] = useState(true); // Controls visibility of the info panel
 
-    // Преобразование данных для CheckboxTree
+    // Transform data for CheckboxTree
     const formatTree = (nodes) =>
         nodes.map((node) => ({
             value: node.id.toString(),
@@ -87,13 +86,10 @@ function App() {
         return values;
     };
 
-    // Определяем базовый URL API. Если переменная окружения REACT_APP_API_URL задана, используем её, иначе – относительный URL.
-    const apiUrl = process.env.REACT_APP_API_URL || '';
-
-    // Получаем структуру секций (используем относительный URL для обращения к API)
+    // Fetch sections structure (using folders URL, unchanged)
     const fetchSections = async () => {
         try {
-            const response = await axios.post(`${apiUrl}/api/testrail/folders`, {
+            const response = await axios.post('http://localhost:5001/api/testrail/folders', {
                 testrailUrl,
                 path
             });
@@ -129,14 +125,15 @@ function App() {
     };
 
     /**
-     * Создаём новый график. Имя всегда "Automation Coverage Chart"
+     * Create a new chart. The name is always "Automation Coverage Chart"
      */
     const buildChart = async () => {
         if (!checked.length) return;
         setLoadingChart(true);
         try {
+            // Use folder IDs as-is
             const folderIds = checked.map((id) => parseInt(id, 10));
-            const response = await axios.post(`${apiUrl}/api/testrail/data`, {
+            const response = await axios.post('http://localhost:5001/api/testrail/data', {
                 testrailUrl,
                 folderIds
             });
@@ -164,7 +161,7 @@ function App() {
         }
     };
 
-    // Скрытие элементов при экспорте
+    // Hide elements during export
     const hideNoExportElements = () => {
         const elements = document.querySelectorAll('.no-export');
         elements.forEach(el => {
@@ -183,7 +180,7 @@ function App() {
     };
 
     /**
-     * Экспорт всех графиков в PDF (многостранично)
+     * Export all charts to PDF (multi-page)
      */
     const exportToPDF = async () => {
         hideNoExportElements();
@@ -235,7 +232,7 @@ function App() {
         pdf.save('charts.pdf');
     };
 
-    // Экспорт одного графика в PNG
+    // Export a single chart to PNG
     const saveChartAsImage = (chartIndex) => {
         const container = document.getElementById(`chart-container-${chartIndex}`);
         const noExports = container.querySelectorAll('.no-export');
@@ -261,7 +258,7 @@ function App() {
         });
     };
 
-    // Редактирование имени графика
+    // Edit chart name
     const startEditingName = (index) => {
         setEditingIndex(index);
         setDraftName(chartsData[index].title);
@@ -274,12 +271,12 @@ function App() {
         setDraftName('');
     };
 
-    // Удаление графика
+    // Remove chart
     const removeChart = (index) => {
         setChartsData(prev => prev.filter((_, i) => i !== index));
     };
 
-    // Иконки для CheckboxTree
+    // Icons for CheckboxTree
     const customIcons = {
         check: <span className="custom-check-icon">✔</span>,
         uncheck: <span className="custom-uncheck-icon"></span>,
@@ -298,6 +295,43 @@ function App() {
             <div className="section-container">
                 {treeData.length > 0 ? (
                     <>
+                        {/* Information panel with instructions placed above "TestRail Sections:" */}
+                        {showInfo && (
+                            <div
+                                className="info-panel"
+                                style={{
+                                    backgroundColor: '#f7f7f7',
+                                    border: '1px solid #ddd',
+                                    padding: '10px',
+                                    borderRadius: '4px',
+                                    marginBottom: '15px',
+                                    fontSize: '14px',
+                                    color: '#333',
+                                    position: 'relative'
+                                }}
+                            >
+                                <button
+                                    onClick={() => setShowInfo(false)}
+                                    style={{
+                                        position: 'absolute',
+                                        top: '5px',
+                                        right: '5px',
+                                        border: 'none',
+                                        background: 'transparent',
+                                        fontSize: '18px',
+                                        cursor: 'pointer'
+                                    }}
+                                    aria-label="Close Instructions"
+                                >
+                                    &times;
+                                </button>
+                                <ol style={{ margin: 0, paddingLeft: '20px' }}>
+                                    <li>Select one or multiple TestRail sections</li>
+                                    <li>Click "Build Chart"</li>
+                                    <li>Enjoy your charts 🙌</li>
+                                </ol>
+                            </div>
+                        )}
                         <div className="section-header">
                             <span className="section-title">TestRail Sections:</span>
                             <div className="button-group">

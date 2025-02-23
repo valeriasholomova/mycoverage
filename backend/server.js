@@ -12,14 +12,14 @@ const PORT = process.env.PORT || 5001;
 
 app.use(express.json());
 
-// Настраиваем CORS для запросов с разрешённого источника
+// Configure CORS for requests from the allowed origin
 app.use(cors({
     origin: process.env.ALLOWED_ORIGIN || 'http://localhost:3000',
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Обработка preflight-запросов
+// Handling preflight requests
 app.options('*', (req, res) => {
     res.header('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || 'http://localhost:3000');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -27,14 +27,14 @@ app.options('*', (req, res) => {
     res.sendStatus(200);
 });
 
-// Rate limiting для защиты от DoS-атак
+// Rate limiting to protect against DoS attacks
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 минут
-    max: 100 // максимум 100 запросов с одного IP за 15 минут
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100 // maximum of 100 requests per IP in 15 minutes
 });
 app.use(limiter);
 
-// Конфигурационные переменные из окружения
+// Configuration variables from the environment
 const projectId = process.env.TESTRAIL_PROJECT_ID || 1;
 const suiteId = process.env.TESTRAIL_SUITE_ID || 1;
 const testrailUrl = process.env.TESTRAIL_URL || 'https://tealium.testrail.io';
@@ -43,7 +43,7 @@ const apiKey = process.env.TESTRAIL_API_KEY || 'your_api_key';
 const authToken = Buffer.from(`${userEmail}:${apiKey}`).toString('base64');
 
 /**
- * Endpoint для получения дерева секций (папок) из TestRail.
+ * Endpoint to fetch the folder tree (sections) from TestRail.
  */
 app.post('/api/testrail/folders',
     body('path').optional().isString(),
@@ -155,10 +155,10 @@ app.post('/api/testrail/data',
     }
 );
 
-// Раздача статических файлов React из папки build (которая находится в backend)
+// Serving static React files from the build folder (located in backend)
 app.use(express.static(path.join(__dirname, 'build')));
 
-// Для поддержки client-side routing отдаём index.html для всех GET-запросов
+// For supporting client-side routing, serve index.html for all GET requests
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
