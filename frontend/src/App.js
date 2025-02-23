@@ -89,7 +89,7 @@ function App() {
     // Fetch sections structure (using folders URL, unchanged)
     const fetchSections = async () => {
         try {
-            const response = await axios.post('http://localhost:5001/api/testrail/folders', {
+            const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/testrail/folders`, {
                 testrailUrl,
                 path
             });
@@ -133,7 +133,7 @@ function App() {
         try {
             // Use folder IDs as-is
             const folderIds = checked.map((id) => parseInt(id, 10));
-            const response = await axios.post('http://localhost:5001/api/testrail/data', {
+            const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/testrail/data`, {
                 testrailUrl,
                 folderIds
             });
