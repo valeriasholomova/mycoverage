@@ -1,7 +1,7 @@
 {
   "name": "my-coverage",
   "version": "1.0.0",
-  "description": "Backend for TestRail integratin",
+  "description": "Backend for TestRail integration",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
