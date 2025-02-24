@@ -7,6 +7,8 @@ import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import './App.css';
 
+const apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5001';
+
 // Set colors for chart segments (unchanged)
 const fixedColors = {
     Yes: '#008000', // green
@@ -89,7 +91,7 @@ function App() {
     // Fetch sections structure (using folders URL, unchanged)
     const fetchSections = async () => {
         try {
-            const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/testrail/folders`, {
+            const response = await axios.post(`${apiUrl}/api/testrail/folders`, {
                 testrailUrl,
                 path
             });
@@ -133,7 +135,7 @@ function App() {
         try {
             // Use folder IDs as-is
             const folderIds = checked.map((id) => parseInt(id, 10));
-            const response = await axios.post(`${process.env.REACT_APP_API_URL}/api/testrail/data`, {
+            const response = await axios.post(`${apiUrl}/api/testrail/data`, {
                 testrailUrl,
                 folderIds
             });

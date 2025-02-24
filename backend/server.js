@@ -19,7 +19,6 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-// Handling preflight requests
 app.options('*', (req, res) => {
     res.header('Access-Control-Allow-Origin', process.env.ALLOWED_ORIGIN || 'http://localhost:3000');
     res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
@@ -27,14 +26,14 @@ app.options('*', (req, res) => {
     res.sendStatus(200);
 });
 
-// Rate limiting to protect against DoS attacks
+// Rate limiting
 const limiter = rateLimit({
-    windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100 // maximum of 100 requests per IP in 15 minutes
+    windowMs: 15 * 60 * 1000,
+    max: 100
 });
 app.use(limiter);
 
-// Configuration variables from the environment
+// Configuration
 const projectId = process.env.TESTRAIL_PROJECT_ID || 1;
 const suiteId = process.env.TESTRAIL_SUITE_ID || 1;
 const testrailUrl = process.env.TESTRAIL_URL || 'https://tealium.testrail.io';
@@ -43,8 +42,82 @@ const apiKey = process.env.TESTRAIL_API_KEY || 'your_api_key';
 const authToken = Buffer.from(`${userEmail}:${apiKey}`).toString('base64');
 
 /**
- * Endpoint to fetch the folder tree (sections) from TestRail.
- * Здесь реализована пагинация с limit=250, так как TestRail не позволяет запрашивать больше.
+ * Fetch all sections with pagination
+ */
+const fetchAllSections = async () => {
+    let allSections = [];
+    let offset = 0;
+    const limit = 250;
+    let fetched = 0;
+    do {
+        const url = `${testrailUrl}/index.php?/api/v2/get_sections/${projectId}&suite_id=${suiteId}&offset=${offset}&limit=${limit}`;
+        console.log(`[SECTIONS] Fetching sections with offset=${offset} and limit=${limit}`);
+        const response = await axios.get(url, {
+            headers: { 'Authorization': `Basic ${authToken}` }
+        });
+        const sectionsBatch = response.data.sections;
+        if (!sectionsBatch || !Array.isArray(sectionsBatch)) {
+            throw new Error('Sections data is not an array');
+        }
+        allSections = allSections.concat(sectionsBatch);
+        fetched = sectionsBatch.length;
+        offset += fetched;
+    } while (fetched === limit);
+    return allSections;
+};
+
+/**
+ * Build a tree of sections based on parent_id (for display)
+ */
+const buildTree = (sections) => {
+    const sectionMap = {};
+    sections.forEach(section => {
+        sectionMap[section.id] = { ...section, children: [] };
+    });
+    const roots = [];
+    sections.forEach(section => {
+        if (section.parent_id !== null && section.parent_id !== 0 && sectionMap[section.parent_id]) {
+            sectionMap[section.parent_id].children.push(sectionMap[section.id]);
+        } else {
+            roots.push(sectionMap[section.id]);
+        }
+    });
+    return roots;
+};
+
+/**
+ * Function to fetch all test cases for a given section with pagination
+ */
+const fetchTestCasesForSection = async (sectionId) => {
+    let allTestCases = [];
+    let offset = 0;
+    const limit = 250;
+    let fetched = 0;
+    do {
+        const url = `${testrailUrl}/index.php?/api/v2/get_cases/${projectId}&suite_id=${suiteId}&section_id=${sectionId}&offset=${offset}&limit=${limit}`;
+        console.log(`[CASES] Fetching test cases for section ${sectionId} with offset=${offset} and limit=${limit}`);
+        const response = await axios.get(url, {
+            headers: { 'Authorization': `Basic ${authToken}` }
+        });
+        let batch = response.data;
+        if (!Array.isArray(batch)) {
+            if (batch && Array.isArray(batch.cases)) {
+                batch = batch.cases;
+            } else {
+                console.error(`[CASES] Expected array for test cases but got: ${typeof response.data}`);
+                throw new Error('Test cases response is not an array');
+            }
+        }
+        allTestCases = allTestCases.concat(batch);
+        fetched = batch.length;
+        offset += fetched;
+    } while (fetched === limit);
+    console.log(`[CASES] Section ${sectionId} total test cases: ${allTestCases.length}`);
+    return allTestCases;
+};
+
+/**
+ * Endpoint for fetching section structure
  */
 app.post('/api/testrail/folders',
     body('path').optional().isString(),
@@ -56,54 +129,8 @@ app.post('/api/testrail/folders',
         const { path: userPath } = req.body;
         console.log(`[FOLDERS] Request received. path=${userPath}`);
         try {
-            // Функция для последовательного получения всех секций с пагинацией
-            const fetchAllSections = async () => {
-                let allSections = [];
-                let offset = 0;
-                const limit = 250;
-                let fetched = 0;
-                do {
-                    const url = `${testrailUrl}/index.php?/api/v2/get_sections/${projectId}&suite_id=${suiteId}&offset=${offset}&limit=${limit}`;
-                    console.log(`[FOLDERS] Fetching sections with offset=${offset} and limit=${limit}`);
-                    const response = await axios.get(url, {
-                        headers: { 'Authorization': `Basic ${authToken}` }
-                    });
-                    // API возвращает секции в поле "sections"
-                    const data = response.data;
-                    const sectionsBatch = data.sections;
-                    if (!sectionsBatch || !Array.isArray(sectionsBatch)) {
-                        throw new Error('Sections data is not an array');
-                    }
-                    allSections = allSections.concat(sectionsBatch);
-                    fetched = sectionsBatch.length;
-                    offset += fetched;
-                } while (fetched === limit);
-                return allSections;
-            };
-
             const sections = await fetchAllSections();
             console.log('[FOLDERS] Total sections fetched:', sections.length);
-
-            // Функция построения дерева секций на основе parent_id
-            const buildTree = (sections) => {
-                const sectionMap = {};
-                // Инициализируем мапу: каждому узлу добавляем пустой массив children
-                sections.forEach(section => {
-                    sectionMap[section.id] = { ...section, children: [] };
-                });
-                const roots = [];
-                sections.forEach(section => {
-                    // Если parent_id не равен null и не равен 0, и родитель присутствует в мапе – добавляем в его children
-                    if (section.parent_id !== null && section.parent_id !== 0 && sectionMap[section.parent_id]) {
-                        sectionMap[section.parent_id].children.push(sectionMap[section.id]);
-                    } else {
-                        // Иначе считаем секцию корневой
-                        roots.push(sectionMap[section.id]);
-                    }
-                });
-                return roots;
-            };
-
             const tree = buildTree(sections);
             console.log('[FOLDERS] Constructed folder tree with', tree.length, 'root nodes');
             res.json(tree);
@@ -115,7 +142,11 @@ app.post('/api/testrail/folders',
 );
 
 /**
- * Endpoint to fetch test cases for selected folder IDs and calculate automation coverage.
+ * Endpoint for fetching test case statistics.
+ * Here we build the final set of sections as follows:
+ * - Include all selected sections (folderIds)
+ * - Add all their ancestors (to fetch test cases from parent sections)
+ * - Add all their descendants
  */
 app.post('/api/testrail/data',
     body('folderIds').isArray(),
@@ -127,51 +158,77 @@ app.post('/api/testrail/data',
         const { folderIds } = req.body;
         console.log(`[DATA] Request received for folderIds: ${folderIds}`);
         try {
-            const fetchTestCases = async (folderId) => {
-                const url = `${testrailUrl}/index.php?/api/v2/get_cases/${projectId}&suite_id=${suiteId}&section_id=${folderId}`;
-                console.log(`[DATA] Fetching test cases for folderId: ${folderId}`);
-                const response = await axios.get(url, {
-                    headers: { 'Authorization': `Basic ${authToken}` }
-                });
-                let testCases = response.data;
-                if (!Array.isArray(testCases)) {
-                    if (testCases && Array.isArray(testCases.cases)) {
-                        testCases = testCases.cases;
-                    } else {
-                        console.error(`[DATA] Expected array but got: ${typeof response.data}`);
-                        throw new Error('Test cases response is not an array');
-                    }
-                }
-                console.log(`[DATA] Received ${testCases.length} test cases for folderId: ${folderId}`);
-                return testCases;
-            };
+            // 1. Fetch all sections
+            const allSections = await fetchAllSections();
+            console.log('[DATA] Total sections fetched:', allSections.length);
 
+            // 2. Build a parentMap
+            const parentMap = {};
+            allSections.forEach(section => {
+                parentMap[section.id] = section.parent_id;
+            });
+
+            // 3. For each selected id, add it, its ancestors, and its descendants
+            const selectedIds = folderIds.map(id => Number(id));
+            const allFolderIdsSet = new Set();
+            // Add selected sections
+            selectedIds.forEach(id => allFolderIdsSet.add(id));
+            // Add ancestors of selected sections
+            selectedIds.forEach(id => {
+                let current = parentMap[id];
+                while (current && current !== 0) {
+                    allFolderIdsSet.add(current);
+                    current = parentMap[current];
+                }
+            });
+            // Add descendants: for each section, if one of its ancestors is selected, add it
+            allSections.forEach(section => {
+                let current = parentMap[section.id];
+                while (current && current !== 0) {
+                    if (selectedIds.includes(current)) {
+                        allFolderIdsSet.add(section.id);
+                        break;
+                    }
+                    current = parentMap[current];
+                }
+            });
+            const allFolderIds = Array.from(allFolderIdsSet);
+            console.log('[DATA] All folder IDs to process:', allFolderIds);
+
+            // 4. Fetch test cases for all sections in parallel
+            const testCasesResults = await Promise.all(
+                allFolderIds.map(id =>
+                    fetchTestCasesForSection(id).catch(err => {
+                        console.error(`Error fetching test cases for section ${id}:`, err.message);
+                        return [];
+                    })
+                )
+            );
+            const allTestCases = [].concat(...testCasesResults);
+            console.log('[DATA] Total test cases fetched:', allTestCases.length);
+
+            // 5. Aggregate statistics
             let totalCounts = { Yes: 0, 'Automation Candidate': 0, No: 0 };
             let candidateTests = [];
             let noTests = [];
-
-            for (let folderId of folderIds) {
-                const testCases = await fetchTestCases(folderId);
-                testCases.forEach(testCase => {
-                    console.log(`TestCase id=${testCase.id}, custom_automation=${testCase.custom_automation}`);
-                    const automationValue = Number(testCase.custom_automation);
-                    if (automationValue === 1) {
-                        totalCounts.Yes += 1;
-                    } else if (automationValue === 3) {
-                        totalCounts['Automation Candidate'] += 1;
-                        candidateTests.push({ id: testCase.id, title: testCase.title });
-                    } else if (automationValue === 2) {
-                        totalCounts.No += 1;
-                        noTests.push({ id: testCase.id, title: testCase.title });
-                    } else {
-                        totalCounts.No += 1;
-                        noTests.push({ id: testCase.id, title: testCase.title });
-                    }
-                });
-            }
+            allTestCases.forEach(testCase => {
+                console.log(`TestCase id=${testCase.id}, custom_automation=${testCase.custom_automation}`);
+                const automationValue = Number(testCase.custom_automation);
+                if (automationValue === 1) {
+                    totalCounts.Yes += 1;
+                } else if (automationValue === 3) {
+                    totalCounts['Automation Candidate'] += 1;
+                    candidateTests.push({ id: testCase.id, title: testCase.title });
+                } else if (automationValue === 2) {
+                    totalCounts.No += 1;
+                    noTests.push({ id: testCase.id, title: testCase.title });
+                } else {
+                    totalCounts.No += 1;
+                    noTests.push({ id: testCase.id, title: testCase.title });
+                }
+            });
 
             const total = totalCounts.Yes + totalCounts['Automation Candidate'] + totalCounts.No;
-            console.log(`[DATA] Total test cases: ${total}`);
             const percentages = total > 0 ? {
                 Yes: (totalCounts.Yes / total * 100).toFixed(1),
                 'Automation Candidate': (totalCounts['Automation Candidate'] / total * 100).toFixed(1),
@@ -179,20 +236,19 @@ app.post('/api/testrail/data',
             } : { Yes: 0, 'Automation Candidate': 0, No: 0 };
 
             const overallCoverage = percentages.Yes;
-            console.log(`[DATA] Percentages calculated. Overall Coverage: ${overallCoverage}%`);
+            console.log(`[DATA] Aggregated total test cases: ${total}`);
+            console.log('[DATA] Percentages:', percentages);
 
             res.json({ totalCounts, percentages, overallCoverage, candidateTests, noTests });
         } catch (error) {
             console.error('[DATA] Error fetching test case statistics:', error.response ? error.response.data : error.message);
-            res.status(500).json({ error: 'Error fetching test case statistics from TestRail' });
+            res.status(500).json({ error: 'Error fetching test case statistics from TestRail', details: error.response ? error.response.data : error.message });
         }
     }
 );
 
-// Serving static React files from the build folder (located in backend)
+// Serving static React files from the build folder
 app.use(express.static(path.join(__dirname, 'build')));
-
-// For supporting client-side routing, serve index.html for all GET requests
 app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
