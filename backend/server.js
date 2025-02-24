@@ -44,6 +44,7 @@ const authToken = Buffer.from(`${userEmail}:${apiKey}`).toString('base64');
 
 /**
  * Endpoint to fetch the folder tree (sections) from TestRail.
+ * Здесь реализована пагинация с limit=250, так как TestRail не позволяет запрашивать больше.
  */
 app.post('/api/testrail/folders',
     body('path').optional().isString(),
@@ -55,34 +56,67 @@ app.post('/api/testrail/folders',
         const { path: userPath } = req.body;
         console.log(`[FOLDERS] Request received. path=${userPath}`);
         try {
-            const response = await axios.get(`${testrailUrl}/index.php?/api/v2/get_sections/${projectId}&suite_id=${suiteId}`, {
-                headers: { 'Authorization': `Basic ${authToken}` }
-            });
-            console.log('[FOLDERS] Sections fetched');
-            const sections = response.data.sections;
-            if (!sections || !Array.isArray(sections)) {
-                throw new Error('Sections data is not an array');
-            }
-            const buildTree = (sections, parentId) => {
-                return sections
-                    .filter(section => section.parent_id == parentId)
-                    .map(section => ({
-                        id: section.id,
-                        name: section.name,
-                        parent_id: section.parent_id,
-                        children: buildTree(sections, section.id)
-                    }));
+            // Функция для последовательного получения всех секций с пагинацией
+            const fetchAllSections = async () => {
+                let allSections = [];
+                let offset = 0;
+                const limit = 250;
+                let fetched = 0;
+                do {
+                    const url = `${testrailUrl}/index.php?/api/v2/get_sections/${projectId}&suite_id=${suiteId}&offset=${offset}&limit=${limit}`;
+                    console.log(`[FOLDERS] Fetching sections with offset=${offset} and limit=${limit}`);
+                    const response = await axios.get(url, {
+                        headers: { 'Authorization': `Basic ${authToken}` }
+                    });
+                    // API возвращает секции в поле "sections"
+                    const data = response.data;
+                    const sectionsBatch = data.sections;
+                    if (!sectionsBatch || !Array.isArray(sectionsBatch)) {
+                        throw new Error('Sections data is not an array');
+                    }
+                    allSections = allSections.concat(sectionsBatch);
+                    fetched = sectionsBatch.length;
+                    offset += fetched;
+                } while (fetched === limit);
+                return allSections;
             };
-            const tree = buildTree(sections, null);
-            console.log('[FOLDERS] Constructed folder tree');
+
+            const sections = await fetchAllSections();
+            console.log('[FOLDERS] Total sections fetched:', sections.length);
+
+            // Функция построения дерева секций на основе parent_id
+            const buildTree = (sections) => {
+                const sectionMap = {};
+                // Инициализируем мапу: каждому узлу добавляем пустой массив children
+                sections.forEach(section => {
+                    sectionMap[section.id] = { ...section, children: [] };
+                });
+                const roots = [];
+                sections.forEach(section => {
+                    // Если parent_id не равен null и не равен 0, и родитель присутствует в мапе – добавляем в его children
+                    if (section.parent_id !== null && section.parent_id !== 0 && sectionMap[section.parent_id]) {
+                        sectionMap[section.parent_id].children.push(sectionMap[section.id]);
+                    } else {
+                        // Иначе считаем секцию корневой
+                        roots.push(sectionMap[section.id]);
+                    }
+                });
+                return roots;
+            };
+
+            const tree = buildTree(sections);
+            console.log('[FOLDERS] Constructed folder tree with', tree.length, 'root nodes');
             res.json(tree);
         } catch (error) {
             console.error('[FOLDERS] Error fetching sections:', error.response ? error.response.data : error.message);
-            res.status(500).json({ error: 'Error fetching folder structure from TestRail' });
+            res.status(500).json({ error: 'Error fetching folder structure from TestRail', details: error.response ? error.response.data : error.message });
         }
     }
 );
 
+/**
+ * Endpoint to fetch test cases for selected folder IDs and calculate automation coverage.
+ */
 app.post('/api/testrail/data',
     body('folderIds').isArray(),
     async (req, res) => {
